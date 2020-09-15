@@ -113,6 +113,10 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._points_read_per_start = 0
         self._nb_points_per_start = 0
 
+    def axis_channel(self, axis):
+        """Return EM2 Channel object for the given controller axis"""
+        return self._em2[axis - 2]
+
     def StateAll(self):
         """Read state of all axis."""
         status = self._em2.acquisition_state
@@ -255,13 +259,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
             raise ValueError('The axis 1 does not use the extra attributes')
 
         name = name.lower()
-        axis -= 1
+        channel = self.axis_channel(axis)
         if name == "range":
-            return self._em2[axis].range
+            return channel.range
         elif name == 'inversion':
-            return self._em2[axis].inversion
+            return channel.inversion
         elif name == 'instantcurrent':
-            return self._em2[axis].current
+            return channel.current
 
 
     def SetExtraAttributePar(self, axis, name, value):
@@ -269,11 +273,11 @@ class Albaem2CoTiCtrl(CounterTimerController):
             raise ValueError('The axis 1 does not use the extra attributes')
 
         name = name.lower()
-        axis -= 1
+        channel = self.axis_channel(axis)
         if name == "range":
-            self._em2[axis].range = value
+            channel.range = value
         elif name == 'inversion':
-            self._em2[axis].inversion = int(value)
+            channel.inversion = int(value)
 
 
 ###############################################################################
