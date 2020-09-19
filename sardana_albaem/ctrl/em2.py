@@ -50,7 +50,7 @@ class Channel(object):
 
     @property
     def current(self):
-        return self.em.command('CHAN{0:02d}:INSC?'.format(self.nb))
+        return float(self.em.command('CHAN{0:02d}:INSC?'.format(self.nb)))
 
     @property
     def voltage(self):
