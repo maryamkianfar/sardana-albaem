@@ -22,7 +22,7 @@ class AlbaemCoTiCtrl(CounterTimerController):
     Value returned by a channel is an average of buffer values.
     """
     MaxDevice = 5
-    class_prop = {
+    ctrl_properties = {
         'Albaemname': {Description: 'Albaem DS name',
                        Type: str},
     }
