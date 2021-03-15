@@ -135,6 +135,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
             self.state = State.Moving
 
         elif state == 'STATE_ON':
+            if self.state == State.Moving:
+                time.sleep(0.2)
             self.state = State.On
 
         elif state == 'STATE_FAULT':
@@ -239,35 +241,34 @@ class Albaem2CoTiCtrl(CounterTimerController):
     def ReadAll(self):
         # self._log.debug("ReadAll(): Entering...")
         # TODO Change the ACQU:MEAS command by CHAN:CURR
-        # data_ready = int(self.sendCmd('ACQU:NDAT?'))
+        data_ready = int(self.sendCmd('ACQU:NDAT?'))
         self.new_data = []
         try:
-            # if self.index < data_ready:
-            # data_len = data_ready - self.index
-            # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
-            self.sendCmd('TMST 0')
+            if self.index < data_ready:
+                # data_len = data_ready - self.index
+                # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
+                self.sendCmd('TMST 0')
 
-            msg = 'ACQU:MEAS? %r' % (0)
-            raw_data = self.sendCmd(msg)
+                msg = 'ACQU:MEAS? %r' % (0)
+                raw_data = self.sendCmd(msg)
 
-            data = eval(raw_data)
-            axis = 1
-            for chn_name, values in data:
-
-                # Apply the formula for each value
-                formula = self.formulas[axis]
-                formula = formula.lower()
-                values_formula = [eval(formula, {'value': val}) for val
-                                    in values]
-                self.new_data.append(values_formula)
-                axis +=1
-            new_data_length = len(self.new_data[0]) - self.index
-            self.index += len(self.new_data[0])
-            print("********", len(self.new_data[0]), self.index)
-            time_data = [self.itime] * new_data_length
-            self.new_data.insert(0, time_data)
-            # if self._repetitions != 1:
-            #     self.index += len(time_data)
+                data = eval(raw_data)
+                axis = 1
+                idx = -1
+                for chn_name, values in data:
+                    # Apply the formula for each value
+                    formula = self.formulas[axis]
+                    formula = formula.lower()
+                    values_formula = [eval(formula, {'value': val}) for val
+                                        in values]
+                    if idx < 0:
+                        idx = len(values_formula)
+                    self.new_data.append(values_formula[self.index:idx])
+                    axis +=1
+                # new_data_length = len(self.new_data[0]) - self.index
+                self.index += len(self.new_data[0])
+                time_data = [self.itime] * len(self.new_data[0])
+                self.new_data.insert(0, time_data)
 
         except Exception as e:
             raise Exception("ReadAll error: %s: " + str(e))
@@ -280,7 +281,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate]:
-            return self.new_data[axis - 1][0][self.index - 1:]
+            return self.new_data[axis - 1][0]
         else:
             val = self.new_data[axis - 1]
             return val
