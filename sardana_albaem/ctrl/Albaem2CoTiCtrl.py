@@ -8,6 +8,25 @@ from sardana.pool import AcqSynch
 from sardana.pool.controller import CounterTimerController, Type, Access, \
     Description, Memorize, Memorized, NotMemorized
 from sardana.sardanavalue import SardanaValue
+from functools import wraps, partial
+
+def debug_it(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        self._log.debug(
+            "Entering {} with args={}, kwargs={} ...".format(
+                func.__name__, args, kwargs
+            )
+        )
+        output = func(self, *args, **kwargs)
+        self._log.debug(
+            "Leaving {} without error ... with output {} ...".format(
+                func.__name__, output
+            )
+        )
+        return output
+
+    return wrapper
 
 __all__ = ['Albaem2CoTiCtrl']
 
@@ -92,6 +111,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         self.lock = Lock()
 
+    @debug_it
     def AddDevice(self, axis):
         """Add device to controller."""
         self._log.debug("AddDevice(%d): Entering...", axis)
@@ -99,11 +119,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if axis != 1:
             self.index = 0
 
+    @debug_it
     def DeleteDevice(self, axis):
         """Delete device from the controller."""
         self._log.debug("DeleteDevice(%d): Entering...", axis)
         # self.albaem_socket.close()
 
+    @debug_it
     def StateAll(self):
         """Read state of all axis."""
         # self._log.debug("StateAll(): Entering...")
@@ -125,11 +147,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self.status = state
         # self._log.debug("StateAll(): %r %r" %(self.state, self.status))
 
+    @debug_it
     def StateOne(self, axis):
         """Read state of one axis."""
         # self._log.debug("StateOne(%d): Entering...", axis)
         return self.state, self.status
 
+    @debug_it
     def LoadOne(self, axis, value, repetitions, latency_time):
         # self._log.debug("LoadOne(%d, %f, %d): Entering...", axis, value,
         #                 repetitions)
@@ -141,7 +165,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         # Set Integration time in ms
         val = self.itime * 1000
-        if val < 0.1:   # minimum integration time 
+        if val < 0.1:   # minimum integration time
             self._log.debug("The minimum integration time is 0.1 ms")
             val = 0.1
         self.sendCmd('ACQU:TIME %r' % val)
@@ -170,6 +194,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         # Set Number of Triggers
         self.sendCmd('ACQU:NTRI %r' % self._repetitions)
 
+    @debug_it
     def PreStartOne(self, axis, value=None):
         # self._log.debug("PreStartOneCT(%d): Entering...", axis)
         if axis != 1:
@@ -182,6 +207,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         return True
 
+    @debug_it
     def StartAll(self):
         """
         Starting the acquisition is done only if before was called
@@ -209,39 +235,44 @@ class Albaem2CoTiCtrl(CounterTimerController):
             self.StateAll()
         return True
 
+    @debug_it
     def ReadAll(self):
         # self._log.debug("ReadAll(): Entering...")
         # TODO Change the ACQU:MEAS command by CHAN:CURR
-        data_ready = int(self.sendCmd('ACQU:NDAT?'))
+        # data_ready = int(self.sendCmd('ACQU:NDAT?'))
         self.new_data = []
         try:
-            if self.index < data_ready:
-                data_len = data_ready - self.index
-                # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
-                self.sendCmd('TMST 0')
+            # if self.index < data_ready:
+            # data_len = data_ready - self.index
+            # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
+            self.sendCmd('TMST 0')
 
-                msg = 'ACQU:MEAS? %r,%r' % (self.index - 1, data_len)
-                raw_data = self.sendCmd(msg)
+            msg = 'ACQU:MEAS? %r' % (0)
+            raw_data = self.sendCmd(msg)
 
-                data = eval(raw_data)
-                axis = 1
-                for chn_name, values in data:
+            data = eval(raw_data)
+            axis = 1
+            for chn_name, values in data:
 
-                    # Apply the formula for each value
-                    formula = self.formulas[axis]
-                    formula = formula.lower()
-                    values_formula = [eval(formula, {'value': val}) for val
-                                      in values]
-                    self.new_data.append(values_formula)
-                    axis +=1
-                time_data = [self.itime] * len(self.new_data[0])
-                self.new_data.insert(0, time_data)
-                if self._repetitions != 1:
-                    self.index += len(time_data)
+                # Apply the formula for each value
+                formula = self.formulas[axis]
+                formula = formula.lower()
+                values_formula = [eval(formula, {'value': val}) for val
+                                    in values]
+                self.new_data.append(values_formula)
+                axis +=1
+            new_data_length = len(self.new_data[0]) - self.index
+            self.index += len(self.new_data[0])
+            print("********", len(self.new_data[0]), self.index)
+            time_data = [self.itime] * new_data_length
+            self.new_data.insert(0, time_data)
+            # if self._repetitions != 1:
+            #     self.index += len(time_data)
 
         except Exception as e:
             raise Exception("ReadAll error: %s: " + str(e))
 
+    @debug_it
     def ReadOne(self, axis):
         # self._log.debug("ReadOne(%d): Entering...", axis)
         if len(self.new_data) == 0:
@@ -249,15 +280,17 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate]:
-            return SardanaValue(self.new_data[axis - 1][0])
+            return self.new_data[axis - 1][0][self.index - 1:]
         else:
             val = self.new_data[axis - 1]
             return val
 
+    @debug_it
     def AbortOne(self, axis):
         # self._log.debug("AbortOne(%d): Entering...", axis)
         self.sendCmd('ACQU:STOP')
 
+    @debug_it
     def sendCmd(self, cmd, rw=True, size=8096):
         with self.lock:
             cmd += ';\n'
@@ -355,6 +388,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 #                Axis Extra Attribute Methods
 ###############################################################################
 
+    @debug_it
     def GetAxisExtraPar(self, axis, name):
         self._log.debug("GetExtraAttributePar(%d, %s): Entering...", axis,
                         name)
@@ -378,6 +412,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             cmd = 'CHAN{0:02d}:INSCurrent?'.format(axis)
             return eval(self.sendCmd(cmd))
 
+    @debug_it
     def SetAxisExtraPar(self, axis, name, value):
         if axis == 1:
             raise ValueError('The axis 1 does not use the extra attributes')
@@ -396,6 +431,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 #                Controller Extra Attribute Methods
 ###############################################################################
 
+    @debug_it
     def SetCtrlPar(self, parameter, value):
         param = parameter.lower()
         if param == 'acquisitionmode':
@@ -403,6 +439,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         else:
             CounterTimerController.SetCtrlPar(self, parameter, value)
 
+    @debug_it
     def GetCtrlPar(self, parameter):
         param = parameter.lower()
         if param == 'acquisitionmode':
