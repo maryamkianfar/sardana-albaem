@@ -186,7 +186,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         # Configure the electrometer on the PrepareOne
         pass
 
-    def PreStartOneCT(self, axis):
+    def PreStartOne(self, axis, value):
         # Check if the communication is stable before start
         try:
             _ = self._em2.acquisition_state
@@ -195,7 +195,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             return False
         return True
 
-    def StartAllCT(self):
+    def StartAll(self):
         """
         Starting the acquisition is done only if before was called
         PreStartOneCT for master channel.
