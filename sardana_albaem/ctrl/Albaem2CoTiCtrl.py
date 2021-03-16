@@ -108,6 +108,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._latency_time = 0.001  # In fact, it is just 320us
         self._repetitions = 0
         self.formulas = {1: 'value', 2: 'value', 3: 'value', 4:'value'}
+        self.state = State.Init
+        self.status = "Initialization."
 
         self.lock = Lock()
 
