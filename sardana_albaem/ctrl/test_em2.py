@@ -1,7 +1,7 @@
 import time
 import click
 import logging
-from em2 import Em2
+from sardana_albaem.ctrl.em2 import Em2
 
 
 log = logging.getLogger('EM_TEST')
