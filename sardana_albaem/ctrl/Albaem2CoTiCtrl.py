@@ -68,13 +68,6 @@ class Albaem2CoTiCtrl(CounterTimerController):
             Memorize: NotMemorized,
             Access: DataAccess.ReadOnly
         },
-        "FORMULA":
-            {
-                Type: str,
-                Description: 'The formula to get the real value.\n '
-                             'e.g. "(value/10)*1e-06"',
-                Access: DataAccess.ReadWrite
-            },
     }
 
     def __init__(self, inst, props, *args, **kwargs):
