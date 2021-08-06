@@ -68,6 +68,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
             Memorize: NotMemorized,
             Access: DataAccess.ReadOnly
         },
+        "Formula":
+            {
+                Type: str,
+                Description: 'The formula to get the real value.\n '
+                             'e.g. "(value/10)*1e-06"',
+                Access: DataAccess.ReadWrite
+            },
     }
 
     def __init__(self, inst, props, *args, **kwargs):
@@ -259,7 +266,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
             return channel.inversion
         elif name == 'instantcurrent':
             return channel.current
-
+        elif name == 'formula':
+            return self.formulas[axis-1]
 
     def SetAxisExtraPar(self, axis, name, value):
         if axis == 1:
@@ -271,6 +279,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
             channel.range = value
         elif name == 'inversion':
             channel.inversion = int(value)
+        elif name == 'formula':
+            self.formulas[axis-1] = value
 
 
 ###############################################################################
