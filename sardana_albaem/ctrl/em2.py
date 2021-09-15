@@ -118,9 +118,11 @@ class Em2(object):
         self.log.setLevel(logging.INFO)
         self.channels = [Channel(self, i) for i in range(1, 5)]
 
-        self.read_index_bug = True
-        if self.software_version > (2, 0):
-            self.read_index_bug = False
+    @property
+    def read_index_bug(self):
+        if self._read_index_bug is None:
+            self._read_index_bug = self.software_version <= (2, 0)
+        return self._read_index_bug
 
     def __getitem__(self, i):
         return self.channels[i]
