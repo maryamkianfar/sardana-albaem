@@ -26,8 +26,6 @@ def main():
     """Main method collecting all the parameters to setup."""
     name = "sardana3-albaem-fw2"
 
-    version = "1.0.0"
-
     description = "AlbaEM Sardana Controller"
 
     author = "kits"
@@ -45,7 +43,8 @@ def main():
 
     setup(
         name=name,
-        version=version,
+        use_scm_version=True,
+        setup_requires=["setuptools_scm"],
         description=description,
         author=author,
         author_email=author_email,
