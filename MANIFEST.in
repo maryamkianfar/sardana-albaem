@@ -1,0 +1,4 @@
+# setuptools-scm automatically adds all files managed by git
+# Remove the tests directory
+prune tests
+prune test
