@@ -22,7 +22,7 @@ class AlbaemCoTiCtrl(CounterTimerController):
     Value returned by a channel is an average of buffer values.
     """
     MaxDevice = 5
-    class_prop = {
+    ctrl_properties = {
         'Albaemname': {Description: 'Albaem DS name',
                        Type: str},
     }
@@ -130,7 +130,7 @@ class AlbaemCoTiCtrl(CounterTimerController):
         if state == 'RUNNING':
             self.AemDevice.Stop()
 
-    def PreStartAllCT(self):
+    def PreStartAll(self):
         self._log.debug("PreStartAllCT(): Entering...")
         self.acqchannels = []
 
@@ -148,20 +148,20 @@ class AlbaemCoTiCtrl(CounterTimerController):
                             self.Albaemname, e)
             raise
 
-    def PreStartOneCT(self, axis):
+    def PreStartOne(self, axis, value):
         """Here we are counting which axes are going to be start, so later
         we can distinguish if we are starting only the master channel."""
         self._log.debug("PreStartOneCT(%d): Entering...", axis)
         self.acqchannels.append(axis)
         return True
 
-    def StartOneCT(self, axis):
+    def StartOne(self, axis, value):
         """Here we are counting which axes are going to be start, so later
         we can distinguish  if we are starting only the master channel."""
         self._log.debug("StartOneCT(%d): Entering...", axis)
         return True
 
-    def StartAllCT(self):
+    def StartAll(self):
         """Starting the acquisition is done only if before was called
         PreStartOneCT for master channel."""
         self._log.debug("StartAllCT(): Entering...")
@@ -174,7 +174,7 @@ class AlbaemCoTiCtrl(CounterTimerController):
                             self.Albaemname, e)
             raise
 
-    def PreLoadOne(self, axis, value, repetitions):
+    def PreLoadOne(self, axis, value, repetitions, latency):
         """Here we are keeping a reference to the master channel, so later
         in StartAll() we can distinguish if we are starting only the master
         channel."""
@@ -182,7 +182,7 @@ class AlbaemCoTiCtrl(CounterTimerController):
         self.master = None
         return True
 
-    def LoadOne(self, axis, value, repetitions):
+    def LoadOne(self, axis, value, repetitions, latency):
         self._log.debug("LoadOne(%d, %f): Entering...", axis, value)
         self.master = axis
 
