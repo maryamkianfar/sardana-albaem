@@ -37,7 +37,7 @@ class Channel(object):
 
     @range.setter
     def range(self, value):
-        return self.em.command('CHAN{0:02d}:CABO:RANGE {1}'.format(self.nb, value))
+        self.em.command('CHAN{0:02d}:CABO:RANGE {1}'.format(self.nb, value))
 
     @property
     def inversion(self):
@@ -46,7 +46,7 @@ class Channel(object):
     @inversion.setter
     def inversion(self, value):
         value = 'Off' if value in (0, 'off', 'OFF', 'Off') else 'On'
-        return self.em.command('CHAN{0:02d}:CABO:INVE {1}'.format(self.nb, value))
+        self.em.command('CHAN{0:02d}:CABO:INVE {1}'.format(self.nb, value))
 
     @property
     def current(self):
@@ -165,7 +165,7 @@ class Em2(object):
 
     @acquisition_time.setter
     def acquisition_time(self, t):
-        return self.command('ACQU:TIME {0}'.format(t*1E3))
+        self.command('ACQU:TIME {0}'.format(t*1E3))
 
     @property
     def nb_points(self):
@@ -173,7 +173,7 @@ class Em2(object):
 
     @nb_points.setter
     def nb_points(self, value):
-        return self.command('ACQU:NTRIG {0}'.format(value))
+        self.command('ACQU:NTRIG {0}'.format(value))
 
     @property
     def nb_points_ready(self):
@@ -185,7 +185,7 @@ class Em2(object):
 
     @trigger_input.setter
     def trigger_input(self, value):
-        return self.command('TRIG:INPU {0}'.format(value))
+        self.command('TRIG:INPU {0}'.format(value))
 
     @property
     def trigger_mode(self):
@@ -193,7 +193,7 @@ class Em2(object):
 
     @trigger_mode.setter
     def trigger_mode(self, value):
-        return self.command('TRIG:MODE {0}'.format(value))
+        self.command('TRIG:MODE {0}'.format(value))
 
     @property
     def trigger_polarity(self):
@@ -201,15 +201,7 @@ class Em2(object):
 
     @trigger_polarity.setter
     def trigger_polarity(self, value):
-        return self.command('TRIG:POLA {0}'.format(value))
-
-    @property
-    def trigger_polarity(self):
-        return self.command('TRIG:POLA?')
-
-    @trigger_polarity.setter
-    def trigger_polarity(self, value):
-        return self.command('TRIG:POLA {0}'.format(value))
+        self.command('TRIG:POLA {0}'.format(value))
 
     @property
     def trigger_precision(self):
@@ -217,7 +209,7 @@ class Em2(object):
 
     @trigger_precision.setter
     def trigger_precision(self, value):
-        return self.command('TRIG:PREC {0}'.format('True' if value else 'False'))
+        self.command('TRIG:PREC {0}'.format('True' if value else 'False'))
 
     @property
     def trigger_delay(self):
@@ -225,7 +217,7 @@ class Em2(object):
 
     @trigger_delay.setter
     def trigger_delay(self, value):
-        return self.command('TRIG:DELA {0}'.format(value*1E3))
+        self.command('TRIG:DELA {0}'.format(value*1E3))
 
     def software_trigger(self):
         return self.command('TRIG:SWSE True')
@@ -236,7 +228,7 @@ class Em2(object):
 
     @acquisition_mode.setter
     def acquisition_mode(self, value):
-        return self.command('ACQU:MODE {0}'.format(value))
+        self.command('ACQU:MODE {0}'.format(value))
 
     @property
     def timestamp_data(self):
@@ -244,7 +236,7 @@ class Em2(object):
 
     @timestamp_data.setter
     def timestamp_data(self, value):
-        return self.command('TMST {0}'.format('True' if value else 'False'))
+        self.command('TMST {0}'.format('True' if value else 'False'))
 
     def start_acquisition(self, soft_trigger=True):
         self.command('ACQU:START' + (' SWTRIG' if soft_trigger else ''))
