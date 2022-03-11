@@ -117,6 +117,7 @@ class Em2(object):
         self.log = logging.getLogger('em2.Em2({0}:{1})'.format(host, port))
         self.log.setLevel(logging.INFO)
         self.channels = [Channel(self, i) for i in range(1, 5)]
+        self._read_index_bug = None
 
     @property
     def read_index_bug(self):
