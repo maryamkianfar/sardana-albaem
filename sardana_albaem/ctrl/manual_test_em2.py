@@ -1,3 +1,7 @@
+""""
+Script for manually testing the Em2 class with a real electrometer.
+Note:  The click dependency will have to be pip installed to use this.
+"""
 import time
 import click
 import logging
@@ -30,7 +34,7 @@ def test_scan(em, integration, repetitions, nb_starts, mode):
     # Arm the electrometer
     em.start_acquisition(soft_trigger=False)
 
-    # Check if the communication is stable before start (PreStartOneCT)
+    # Check if the communication is stable before start (PreStartOne)
     if em.acquisition_state != 'RUNNING':
         log.error('State after start is not RUNNING, State %s',
                   em.acquisition_state)
