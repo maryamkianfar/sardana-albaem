@@ -103,14 +103,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._em2 = Em2(self.AlbaEmHost, self.Port)
         self._synchronization = AcqSynch.SoftwareTrigger
         self._latency_time = 0.001  # In fact, it is just 320us
-        self._skipp_start = False
-        self._aborted_flg = False
-        self._started_flg = False
-        self._points_read_per_start = 0
-        self._nb_points_per_start = 0
-        self._last_index_point = 0
+        self._skip_sw_trigger_on_start = False
+        self._aborted = False
+        self._nb_points_read_per_start = 0
+        self._nb_points_expected_per_start = 0
+        self._nb_points_fetched = 0
         self._new_data = {}
-        self._nb_start = 0
         self._state = State.On
         self._status = 'On'
 
@@ -121,14 +119,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if status in ['ACQUIRING', 'RUNNING']:
             self._em2.stop_acquisition()
 
-        self._skipp_start = False
-        self._last_index_point = 0
+        self._skip_sw_trigger_on_start = False
+        self._nb_points_fetched = 0
         self._new_data = {}
-        self._aborted_flg = False
-        self._started_flg = False
-        self._nb_points = 0
-        self._points_read_per_start = 0
-        self._nb_points_per_start = 0
+        self._aborted = False
+        self._nb_points_read_per_start = 0
+        self._nb_points_expected_per_start = 0
 
     def axis_channel(self, axis):
         """Return EM2 Channel object for the given controller axis"""
@@ -147,8 +143,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
             return
 
         # The state depends of the number of point read per start
-        read_ready = self._points_read_per_start == self._nb_points_per_start
-        if read_ready or self._aborted_flg:
+        read_ready = self._nb_points_read_per_start == self._nb_points_expected_per_start
+        if read_ready or self._aborted:
             self._state = State.On
             self._status = 'ON'
         else:
@@ -174,7 +170,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             raise ValueError('The Start synchronization is not allowed yet')
 
         self._clean_variables()
-        self._nb_points_per_start = repetitions
+        self._nb_points_expected_per_start = repetitions
         nb_points = repetitions * nb_starts
         self._acq_time = value
         latency_time = latency
@@ -187,10 +183,10 @@ class Albaem2CoTiCtrl(CounterTimerController):
             mode = 'SOFTWARE'
         elif self._synchronization == AcqSynch.HardwareTrigger:
             mode = 'HARDWARE'
-            self._skipp_start = True
+            self._skip_sw_trigger_on_start = True
         elif self._synchronization == AcqSynch.HardwareGate:
             mode = 'GATE'
-            self._skipp_start = True
+            self._skip_sw_trigger_on_start = True
 
         # Configure the electrometer
         self._em2.acquisition_time = self._acq_time
@@ -199,7 +195,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         # This controller is not ready to use the timestamp
         self._em2.timestamp_data = False
 
-        # Arm the electromter
+        # Arm the electrometer
         self._em2.start_acquisition(soft_trigger=False)
 
     @debug_it
@@ -223,8 +219,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
         Starting the acquisition is done only if before was called
         PreStartOne for master channel.
         """
-        self._points_read_per_start = 0
-        if self._skipp_start:
+        self._nb_points_read_per_start = 0
+        if self._skip_sw_trigger_on_start:
             return
 
         self._em2.software_trigger()
@@ -232,11 +228,11 @@ class Albaem2CoTiCtrl(CounterTimerController):
     @debug_it
     def ReadAll(self):
         # TODO Change the ACQU:MEAS command by CHAN:CURR
-        data_ready = self._em2.nb_points_ready
-        if self._last_index_point < data_ready:
-            data_len = data_ready - self._last_index_point
-            self._points_read_per_start += data_len
-            self._new_data = self._em2.read(self._last_index_point, data_len)
+        nb_points_ready = self._em2.nb_points_ready
+        if self._nb_points_fetched < nb_points_ready:
+            data_len = nb_points_ready - self._nb_points_fetched
+            self._nb_points_read_per_start += data_len
+            self._new_data = self._em2.read(self._nb_points_fetched, data_len)
             try:
                 for axis in range(1, 5):
                     formula = self.formulas[axis]
@@ -248,7 +244,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
                         self._new_data[channel] = values
 
                 self._new_data['CHAN00'] = [self._acq_time] * data_len
-                self._last_index_point = data_ready
+                self._nb_points_fetched = nb_points_ready
             except Exception as e:
                 raise Exception('ReadAll error: {0}'.format(e))
 
@@ -269,8 +265,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
     @debug_it
     def AbortOne(self, axis):
-        if not self._aborted_flg:
-            self._aborted_flg = True
+        if not self._aborted:
+            self._aborted = True
             self._em2.stop_acquisition()
 
 ###############################################################################
@@ -358,7 +354,7 @@ def main():
     print(time.time() - t0 - acqtime)
     ctrl.ReadAll()
     print(ctrl.ReadOne(2))
-    return ctrl
+
 
 if __name__ == '__main__':
     main()
