@@ -251,7 +251,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
     @debug_it
     def ReadOne(self, axis):
         if len(self._new_data) == 0:
-            return None
+            if self._synchronization in [AcqSynch.SoftwareTrigger,
+                                         AcqSynch.SoftwareGate]:
+                return None
+            else:
+                return []
+
         axis -= 1
         channel = 'CHAN0{0}'.format(axis)
         values = list(self._new_data[channel])
