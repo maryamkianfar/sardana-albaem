@@ -3,4 +3,5 @@ include:
     file: '/.python-ci.yml'
 
 variables:
-  RPM_ENABLED: "false"
+  PYTHON_VERSIONS: 'python2.7'
+  FPM_FLAGS: '--no-python-fix-name --no-python-fix-dependencies -d sardana'
