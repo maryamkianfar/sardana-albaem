@@ -3,5 +3,5 @@ include:
     file: '/.python-ci.yml'
 
 variables:
-  PYTHON_VERSIONS: 'python2.7'
+  PYTHON_VERSIONS: '/python2.7/'
   FPM_FLAGS: '--no-python-fix-name --no-python-dependencies -d sardana -d python-sockio'
