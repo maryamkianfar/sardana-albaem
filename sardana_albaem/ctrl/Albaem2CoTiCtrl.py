@@ -104,6 +104,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._synchronization = AcqSynch.SoftwareTrigger
         self._latency_time = 0.001  # In fact, it is just 320us
         self._use_sw_trigger = True
+        self._started = False
         self._aborted = False
         self._nb_points_read_per_start = 0
         self._nb_points_expected_per_start = 0
@@ -121,6 +122,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         self._use_sw_trigger = True
         self._new_data = {}
+        self._started = False
         self._aborted = False
         self._nb_points_fetched = 0
         self._nb_points_read_per_start = 0
@@ -198,9 +200,6 @@ class Albaem2CoTiCtrl(CounterTimerController):
         # This controller is not ready to use the timestamp
         self._em2.timestamp_data = False
 
-        # Arm the electrometer
-        self._em2.start_acquisition(soft_trigger=False)
-
     @debug_it
     def LoadOne(self, axis, integ_time, repetitions, latency_time):
         # Configure the electrometer on the PrepareOne
@@ -219,6 +218,9 @@ class Albaem2CoTiCtrl(CounterTimerController):
     @debug_it
     def StartAll(self):
         self._nb_points_read_per_start = 0
+        if not self._started:
+            self._em2.start_acquisition(soft_trigger=False)
+            self._started = True
         if self._use_sw_trigger:
             self._em2.software_trigger()
 
