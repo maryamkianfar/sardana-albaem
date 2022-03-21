@@ -145,7 +145,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             return
 
         read_ready = self._nb_points_read_per_start == self._nb_points_expected_per_start
-        if read_ready or self._aborted:
+        if read_ready or self._aborted or not self._started:
             self._state = State.On
             self._status = 'ON'
         else:
