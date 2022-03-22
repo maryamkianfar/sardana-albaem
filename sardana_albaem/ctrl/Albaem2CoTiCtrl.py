@@ -103,7 +103,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._em2 = Em2(self.AlbaEmHost, self.Port)
         self._synchronization = AcqSynch.SoftwareTrigger
         self._latency_time = 0.001  # In fact, it is just 320us
-        self._skip_sw_trigger_on_start = False
+        self._use_sw_trigger = True
+        self._started = False
         self._aborted = False
         self._nb_points_read_per_start = 0
         self._nb_points_expected_per_start = 0
@@ -119,10 +120,11 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if status in ['ACQUIRING', 'RUNNING']:
             self._em2.stop_acquisition()
 
-        self._skip_sw_trigger_on_start = False
-        self._nb_points_fetched = 0
+        self._use_sw_trigger = True
         self._new_data = {}
+        self._started = False
         self._aborted = False
+        self._nb_points_fetched = 0
         self._nb_points_read_per_start = 0
         self._nb_points_expected_per_start = 0
 
@@ -133,26 +135,25 @@ class Albaem2CoTiCtrl(CounterTimerController):
     @debug_it
     def StateAll(self):
         """Read state of all axis."""
-        status = self._em2.acquisition_state
-        self._log.debug('StateAll() HW status %s', status)
-        allowed_states = ['ACQUIRING', 'RUNNING', 'ON',
-                          'FAULT']
-        if status == 'FAULT' or status not in allowed_states:
+        hardware_state = self._em2.acquisition_state
+        self._log.debug('HW status %s', hardware_state)
+
+        allowed_states = ['ACQUIRING', 'RUNNING', 'ON', 'FAULT']
+        if hardware_state == 'FAULT' or hardware_state not in allowed_states:
             self._state = State.Fault
-            self._status = status
+            self._status = hardware_state
             return
 
-        # The state depends of the number of point read per start
         read_ready = self._nb_points_read_per_start == self._nb_points_expected_per_start
-        if read_ready or self._aborted:
+        if read_ready or self._aborted or not self._started:
             self._state = State.On
             self._status = 'ON'
         else:
             self._state = State.Moving
             self._status = 'MOVING'
-            if status == 'ON':
+            if hardware_state == 'ON':
+                self._log.warning('Data not ready, but HW status is ON - forcing ReadAll')
                 self.ReadAll()
-                self._log.warning('Data not ready and state is ON')
 
     @debug_it
     def StateOne(self, axis):
@@ -179,14 +180,18 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         if self._synchronization in [AcqSynch.SoftwareGate,
                                      AcqSynch.SoftwareTrigger]:
-
             mode = 'SOFTWARE'
+            self._use_sw_trigger = True
         elif self._synchronization == AcqSynch.HardwareTrigger:
             mode = 'HARDWARE'
-            self._skip_sw_trigger_on_start = True
+            self._use_sw_trigger = False
         elif self._synchronization == AcqSynch.HardwareGate:
             mode = 'GATE'
-            self._skip_sw_trigger_on_start = True
+            self._use_sw_trigger = False
+        else:
+            raise ValueError(
+                'Unsupported synchronization mode: {0}'.format(self._synchronization)
+            )
 
         # Configure the electrometer
         self._em2.acquisition_time = self._acq_time
@@ -194,9 +199,6 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._em2.nb_points = nb_points
         # This controller is not ready to use the timestamp
         self._em2.timestamp_data = False
-
-        # Arm the electrometer
-        self._em2.start_acquisition(soft_trigger=False)
 
     @debug_it
     def LoadOne(self, axis, integ_time, repetitions, latency_time):
@@ -215,15 +217,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
     @debug_it
     def StartAll(self):
-        """
-        Starting the acquisition is done only if before was called
-        PreStartOne for master channel.
-        """
         self._nb_points_read_per_start = 0
-        if self._skip_sw_trigger_on_start:
-            return
-
-        self._em2.software_trigger()
+        if not self._started:
+            self._em2.start_acquisition(soft_trigger=False)
+            self._started = True
+        if self._use_sw_trigger:
+            self._em2.software_trigger()
 
     @debug_it
     def ReadAll(self):
