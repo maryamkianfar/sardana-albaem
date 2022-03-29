@@ -125,9 +125,8 @@ class Albaem2OneDCtrl(OneDController):
         self._latency_time = 0.001  # In fact, it is just 320us
         self._repetitions = 0
         self.formulas = {1: 'value', 2: 'value', 3: 'value', 4:'value'}
-
         self._points_per_step = 1
-
+        self._is_aborted = False
         self.lock = Lock()
 
     @debug_it
@@ -267,7 +266,7 @@ class Albaem2OneDCtrl(OneDController):
         # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
         self.sendCmd('TMST 0')
 
-        msg = 'ACQU:MEAS? %r,%r' % (-1, data_ready)
+        msg = 'ACQU:MEAS? %r,%r' % (0, data_ready)
         raw_data = self.sendCmd(msg)
 
         data = eval(raw_data)
