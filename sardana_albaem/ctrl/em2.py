@@ -117,13 +117,23 @@ class Em2(object):
         self.log = logging.getLogger('em2.Em2({0}:{1})'.format(host, port))
         self.log.setLevel(logging.INFO)
         self.channels = [Channel(self, i) for i in range(1, 5)]
+        self._software_version = None
         self._read_index_bug = None
+        self._long_acquisition_scaling_bug = None
 
     @property
     def read_index_bug(self):
         if self._read_index_bug is None:
             self._read_index_bug = self.software_version <= (2, 0)
         return self._read_index_bug
+
+    @property
+    def long_acquisition_scaling_bug(self):
+        if self._long_acquisition_scaling_bug is None:
+            self._long_acquisition_scaling_bug = (
+                    (1, 3, 5) <= self.software_version < (2, 1)
+            )
+        return self._long_acquisition_scaling_bug
 
     def __getitem__(self, i):
         return self.channels[i]
@@ -151,9 +161,10 @@ class Em2(object):
 
     @property
     def software_version(self):
-        str_version = self.idn.split(',')[-1].strip()
-        version = tuple([int(x) for x in str_version.split('.')])
-        return version
+        if self._software_version is None:
+            str_version = self.idn.split(',')[-1].strip()
+            self._software_version = tuple([int(x) for x in str_version.split('.')])
+        return self._software_version
 
     @property
     def acquisition_state(self):
@@ -254,7 +265,23 @@ class Em2(object):
         cmd = 'ACQU:MEAS? {0}'.format(start_pos)
         if nb is not None:
             cmd += ',{0}'.format(nb)
-        return dict(eval(self.command(cmd)))
+        data = dict(eval(self.command(cmd)))
+        if self.long_acquisition_scaling_bug:
+            data = self._correct_for_long_acquisition_scaling_bug(data)
+        return data
+
+    def _correct_for_long_acquisition_scaling_bug(self, data):
+        accumulator_overflow_time = 2.621441
+        nb_accumulator_overflows = int(self.acquisition_time / accumulator_overflow_time)
+        if nb_accumulator_overflows > 0:
+            nb_bits_lost_for_overflow = int.bit_length(nb_accumulator_overflows)
+            factor = 2 ** nb_bits_lost_for_overflow
+            corrected_data = {}
+            for channel, values in data.items():
+                corrected_data[channel] = [v * factor for v in values]
+        else:
+            corrected_data = data
+        return corrected_data
 
     def __repr__(self):
         channels = '\n'.join(repr(c) for c in self.channels)
