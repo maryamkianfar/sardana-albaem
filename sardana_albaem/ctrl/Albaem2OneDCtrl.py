@@ -14,6 +14,12 @@ import six
 
 __all__ = ['Albaem2OneDCtrl']
 
+MINIMUM_INTEGRATION_TIME_MS = 0.1
+# for details of the maximum time calculation see em2.py:
+#   Em2._correct_for_long_acquisition_scaling_bug
+MAXIMUM_INTEGRATION_TIME_WITHOUT_OVERFLOW_MS = 2621.0
+
+
 def debug_it(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -182,9 +188,22 @@ class Albaem2OneDCtrl(OneDController):
 
         # Set Integration time in ms
         val = self.itime * 1000
-        if val < 0.1:   # minimum integration time
-            self._log.debug("The minimum integration time is 0.1 ms")
-            raise Exception('The minimum integration time is 0.1 ms')
+        error_msg = ""
+        if val < MINIMUM_INTEGRATION_TIME_MS:
+            error_msg = (
+                "Requested integration time, {} ms, too short. "
+                "Minimum is {} ms.".format(val, MINIMUM_INTEGRATION_TIME_MS)
+            )
+        elif val > MAXIMUM_INTEGRATION_TIME_WITHOUT_OVERFLOW_MS:
+            error_msg = (
+                "Requested integration time, {} ms, too long. "
+                "Maximum without overflow is {} ms.".format(
+                    val, MAXIMUM_INTEGRATION_TIME_WITHOUT_OVERFLOW_MS
+                )
+            )
+        if error_msg:
+            self._log.error(error_msg)
+            raise Exception(error_msg)
         self.sendCmd('ACQU:TIME %r' % val)
 
         if self._synchronization in [AcqSynch.SoftwareTrigger,
