@@ -271,7 +271,11 @@ class Em2(object):
         return data
 
     def _correct_for_long_acquisition_scaling_bug(self, data):
-        accumulator_overflow_time = 2.621441
+        nb_samples_without_overflow = 8192
+        adc_raw_sampling_rate = 200e3  # Hz
+        adc_oversampling_factor = 64
+        sampling_rate = adc_raw_sampling_rate / adc_oversampling_factor
+        accumulator_overflow_time = nb_samples_without_overflow / sampling_rate  # sec
         nb_accumulator_overflows = int(self.acquisition_time / accumulator_overflow_time)
         if nb_accumulator_overflows > 0:
             nb_bits_lost_for_overflow = int.bit_length(nb_accumulator_overflows)

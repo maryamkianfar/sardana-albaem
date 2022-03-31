@@ -15,6 +15,8 @@ import six
 __all__ = ['Albaem2OneDCtrl']
 
 MINIMUM_INTEGRATION_TIME_MS = 0.1
+# for details of the maximum time calculation see em2.py:
+#   Em2._correct_for_long_acquisition_scaling_bug
 MAXIMUM_INTEGRATION_TIME_WITHOUT_OVERFLOW_MS = 2621.0
 
 
