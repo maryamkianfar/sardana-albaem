@@ -5,7 +5,7 @@ Note:  The click dependency will have to be pip installed to use this.
 import time
 import click
 import logging
-from sardana_albaem.ctrl.em2 import Em2
+from sardana_albaem.ctrl.em2 import Em2, ZMQ_STREAMING_PORT
 
 
 log = logging.getLogger('EM_TEST')
@@ -52,7 +52,7 @@ def test_scan(em, integration, repetitions, nb_starts, trig_mode, acq_mode):
             data_ready = em.nb_points_ready
             log.debug('Data ready %d', data_ready)
             new_data = em.read(data_ready - 1, 1)
-            log.debug('Data read %s', new_data)
+            log.info('Data read %s', new_data)
             if len(new_data) != 4:
                 log.error('There is not data from all 4 channels %s', new_data)
             if len(new_data['CHAN01']) != 1 or \
@@ -68,7 +68,7 @@ def test_scan(em, integration, repetitions, nb_starts, trig_mode, acq_mode):
         data_ready = em.nb_points_ready
         log.debug('Data ready %d', data_ready)
         new_data = em.read(0, data_ready)
-        log.debug('Data read %s', new_data)
+        log.info('Data read %s', new_data)
         if len(new_data) != 4:
             log.error('There is not data from all 4 channels %s', new_data)
 
@@ -118,12 +118,16 @@ def get_acquisition_state(em, nb_points_expected):
               type=click.Choice(['CURRENT', 'CHARGE', 'FAST_BUFFER', ]))
 @click.option('--debug', default=False, flag_value=True)
 @click.option('--stop', default=False, flag_value=True, help='Stop acquisition after test')
-def main(host, port, nb_scans, integration, nb_points, trig_mode, acq_mode, debug, stop):
+@click.option('--zmq_port', type=click.INT,
+              default=ZMQ_STREAMING_PORT, help="ZMQ fast-buffer streaming port")
+def main(host, port, nb_scans, integration, nb_points, trig_mode, acq_mode, debug, stop, zmq_port):
     level = logging.INFO
     if debug:
         level = logging.DEBUG
     logging.basicConfig(level=level)
-    em = Em2(host, port)
+    em = Em2(host, port, zmq_port)
+    em.log.setLevel(level)
+
     trig_mode = trig_mode.upper()
     if trig_mode == 'SOFTWARE':
         repetitions = 1

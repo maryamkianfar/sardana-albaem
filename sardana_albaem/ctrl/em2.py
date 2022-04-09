@@ -2,9 +2,13 @@
 ALBA EM2 client
 '''
 
-import sys
-import time
 import logging
+import queue
+import sys
+import threading
+import time
+
+import zmq
 
 PY34 = sys.version_info >= (3, 4)
 
@@ -17,6 +21,12 @@ else:
 class Em2Error(Exception):
     pass
 
+SCPI_CONTROL_PORT = 5025
+ZMQ_STREAMING_PORT = 22003
+ZMQ_READ_TIMEOUT_MS = 50
+
+CHANNEL_MIN = 1
+CHANNEL_MAX = 4
 
 CHANNEL_TEMPLATE = """\
 Channel {o.nb}:
@@ -108,18 +118,20 @@ class AcquisitionData(object):
 # TODO: Remove old style class implementation when we go to py3
 class Em2(object):
 
-    def __init__(self, host, port=5025):
+    def __init__(self, host, port=SCPI_CONTROL_PORT, zmq_port=ZMQ_STREAMING_PORT):
         self.host = host
         self.port = port
         self._sock = TCP(host, port)
+        self._zmq_receiver = ZmqStreamReceiver(host, zmq_port)
         # TODO: Remove when sardana allows to use the configuration file
         logging.getLogger('sockio').setLevel(logging.INFO)
         self.log = logging.getLogger('em2.Em2({0}:{1})'.format(host, port))
         self.log.setLevel(logging.INFO)
-        self.channels = [Channel(self, i) for i in range(1, 5)]
+        self.channels = [Channel(self, i) for i in range(CHANNEL_MIN, CHANNEL_MAX + 1)]
         self._software_version = None
         self._read_index_bug = None
         self._long_acquisition_scaling_bug = None
+        self._zmq_streaming_supported = None
 
     @property
     def read_index_bug(self):
@@ -134,6 +146,16 @@ class Em2(object):
                     (1, 3, 5) <= self.software_version < (2, 1)
             )
         return self._long_acquisition_scaling_bug
+
+    @property
+    def zmq_streaming_supported(self):
+        if self._zmq_streaming_supported is None:
+            self._zmq_streaming_supported = self.software_version >= (2, 2)
+        return self._zmq_streaming_supported
+
+    @property
+    def zmq_streaming_required(self):
+        return self.acquisition_mode.upper() == 'FAST_BUFFER'
 
     def __getitem__(self, i):
         return self.channels[i]
@@ -188,6 +210,12 @@ class Em2(object):
 
     @property
     def nb_points_ready(self):
+        if self._zmq_receiver.running:
+            return self._zmq_receiver.nb_points_received
+        else:
+            return self._get_nb_points_ready_via_scpi()
+
+    def _get_nb_points_ready_via_scpi(self):
         return int(self.command('ACQU:NDAT?'))
 
     @property
@@ -250,16 +278,27 @@ class Em2(object):
         self.command('TMST {0}'.format('True' if value else 'False'))
 
     def start_acquisition(self, soft_trigger=True):
+        if self.zmq_streaming_required and self.zmq_streaming_supported:
+            self._zmq_receiver.start()
         self.command('ACQU:START' + (' SWTRIG' if soft_trigger else ''))
 
     def stop_acquisition(self):
-        return self.command('ACQU:STOP True')
+        self.command('ACQU:STOP True')
+        if self._zmq_receiver.running:
+            self._zmq_receiver.stop()
 
     @property
     def data(self):
         return AcquisitionData(self)
 
     def read(self, start_pos=0, nb=None):
+        if self._zmq_receiver.running:
+            data = self._zmq_receiver.read_as_scpi(start_pos, nb)
+        else:
+            data = self._read_via_scpi(start_pos, nb)
+        return data
+
+    def _read_via_scpi(self, start_pos=0, nb=None):
         if self.read_index_bug:
             start_pos -= 1
         cmd = 'ACQU:MEAS? {0}'.format(start_pos)
@@ -290,6 +329,114 @@ class Em2(object):
     def __repr__(self):
         channels = '\n'.join(repr(c) for c in self.channels)
         return TEMPLATE.format(o=self, channels=channels)
+
+
+class ZmqStreamReceiver(object):
+
+    def __init__(self, host, port):
+        self._host = host
+        self._port = port
+        self._running = False
+        self._thread = None
+        self._reset_message_queue()
+
+    def _reset_message_queue(self):
+        self._messages = CountableQueue()
+
+    @property
+    def nb_points_received(self):
+        return self._messages.count
+
+    def read_as_scpi(self, start_pos, nb):
+        nb = self._get_nb_messages_to_read(start_pos, nb)
+        channel_keys = ["CHAN{:02d}".format(index)
+                        for index in range(CHANNEL_MIN, CHANNEL_MAX+1)]
+        scpi_format_data = {channel: [] for channel in channel_keys}
+        for _ in range(nb):
+            message = self._messages.get()
+            for channel in channel_keys:
+                scpi_format_data[channel].append(message[channel])
+        return scpi_format_data
+
+    def _get_nb_messages_to_read(self, start_pos, nb):
+        front = self._messages.front
+        count = self._messages.count
+        available = count - front
+        if start_pos != front:
+            raise RuntimeError(
+                "Reads must be from the front of the queue. {} != {}."
+                    .format(start_pos, front)
+            )
+        if nb is None:
+            nb = available
+        elif nb > available:
+            raise RuntimeError(
+                "Cannot read more items than in the queue. {} > {}."
+                    .format(nb, available)
+            )
+        return nb
+
+    def start(self):
+        if self._running:
+            self.stop()
+        self._thread = threading.Thread(
+            target=self._zmq_receiver,
+            name='zmq-receiver',
+            daemon=True,
+        )
+        self._running = True
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        self._thread.join()
+
+    @property
+    def running(self):
+        return self._running
+
+    def _zmq_receiver(self):
+        self._reset_message_queue()
+        context = zmq.Context()
+        receiver = context.socket(zmq.PULL)
+        receiver.connect('tcp://{}:{}'.format(self._host, self._port))
+        poller = zmq.Poller()
+        poller.register(receiver, zmq.POLLIN)
+        while self._running:
+            if poller.poll(timeout=ZMQ_READ_TIMEOUT_MS):
+                message = receiver.recv_json()
+                if 'message_type' in message and message['message_type'] == 'data':
+                    self._messages.put(message)
+
+
+class CountableQueue(object):
+
+    def __init__(self):
+        self._queue = queue.Queue()
+        self._lock = threading.Lock()
+        self._front = 0
+        self._count = 0
+
+    @property
+    def count(self):
+        with self._lock:
+            return self._count
+
+    @property
+    def front(self):
+        with self._lock:
+            return self._front
+
+    def put(self, item):
+        with self._lock:
+            self._queue.put(item)
+            self._count += 1
+
+    def get(self):
+        with self._lock:
+            item = self._queue.get()
+            self._front += 1
+            return item
 
 
 def acquire(em, acq_time=None, nb_points=None, read=True):
