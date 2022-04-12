@@ -291,19 +291,19 @@ class Em2(object):
     def data(self):
         return AcquisitionData(self)
 
-    def read(self, start_pos=0, nb=None):
+    def read(self, start_pos=0, nb_points=None):
         if self._zmq_receiver.running:
-            data = self._zmq_receiver.read_as_scpi(start_pos, nb)
+            data = self._zmq_receiver.read(start_pos, nb_points)
         else:
-            data = self._read_via_scpi(start_pos, nb)
+            data = self._read_via_scpi(start_pos, nb_points)
         return data
 
-    def _read_via_scpi(self, start_pos=0, nb=None):
+    def _read_via_scpi(self, start_pos=0, nb_points=None):
         if self.read_index_bug:
             start_pos -= 1
         cmd = 'ACQU:MEAS? {0}'.format(start_pos)
-        if nb is not None:
-            cmd += ',{0}'.format(nb)
+        if nb_points is not None:
+            cmd += ',{0}'.format(nb_points)
         data = dict(eval(self.command(cmd)))
         if self.long_acquisition_scaling_bug:
             data = self._correct_for_long_acquisition_scaling_bug(data)
@@ -338,43 +338,48 @@ class ZmqStreamReceiver(object):
         self._port = port
         self._running = False
         self._thread = None
-        self._reset_message_queue()
+        self._clear_message_queue()
 
-    def _reset_message_queue(self):
+    def _clear_message_queue(self):
         self._messages = CountableQueue()
 
     @property
     def nb_points_received(self):
-        return self._messages.count
+        return self._messages.total_count
 
-    def read_as_scpi(self, start_pos, nb):
-        nb = self._get_nb_messages_to_read(start_pos, nb)
-        channel_keys = ["CHAN{:02d}".format(index)
-                        for index in range(CHANNEL_MIN, CHANNEL_MAX+1)]
-        scpi_format_data = {channel: [] for channel in channel_keys}
-        for _ in range(nb):
+    def read(self, start_pos, nb_points):
+        nb_points = self._get_nb_messages_to_read(start_pos, nb_points)
+        scpi_format_data = self._prepare_scpi_format_data()
+        for _ in range(nb_points):
             message = self._messages.get()
-            for channel in channel_keys:
+            for channel in scpi_format_data:
                 scpi_format_data[channel].append(message[channel])
         return scpi_format_data
 
-    def _get_nb_messages_to_read(self, start_pos, nb):
-        front = self._messages.front
-        count = self._messages.count
-        available = count - front
-        if start_pos != front:
+    def _get_nb_messages_to_read(self, start_position, nb_points):
+        front_position = self._messages.front_position
+        total_count = self._messages.total_count
+        available = total_count - front_position
+        if start_position != front_position:
             raise RuntimeError(
                 "Reads must be from the front of the queue. {} != {}."
-                    .format(start_pos, front)
+                    .format(start_position, front_position)
             )
-        if nb is None:
-            nb = available
-        elif nb > available:
+        if nb_points is None:
+            nb_points = available
+        elif nb_points > available:
             raise RuntimeError(
                 "Cannot read more items than in the queue. {} > {}."
-                    .format(nb, available)
+                    .format(nb_points, available)
             )
-        return nb
+        return nb_points
+
+    @staticmethod
+    def _prepare_scpi_format_data():
+        channel_keys = ["CHAN{:02d}".format(index)
+                        for index in range(CHANNEL_MIN, CHANNEL_MAX + 1)]
+        scpi_format_data = {channel: [] for channel in channel_keys}
+        return scpi_format_data
 
     def start(self):
         if self._running:
@@ -396,7 +401,7 @@ class ZmqStreamReceiver(object):
         return self._running
 
     def _zmq_receiver(self):
-        self._reset_message_queue()
+        self._clear_message_queue()
         context = zmq.Context()
         receiver = context.socket(zmq.PULL)
         receiver.connect('tcp://{}:{}'.format(self._host, self._port))
@@ -414,28 +419,28 @@ class CountableQueue(object):
     def __init__(self):
         self._queue = queue.Queue()
         self._lock = threading.Lock()
-        self._front = 0
-        self._count = 0
+        self._front_position = 0
+        self._total_count = 0
 
     @property
-    def count(self):
+    def total_count(self):
         with self._lock:
-            return self._count
+            return self._total_count
 
     @property
-    def front(self):
+    def front_position(self):
         with self._lock:
-            return self._front
+            return self._front_position
 
     def put(self, item):
         with self._lock:
             self._queue.put(item)
-            self._count += 1
+            self._total_count += 1
 
     def get(self):
         with self._lock:
             item = self._queue.get()
-            self._front += 1
+            self._front_position += 1
             return item
 
 
