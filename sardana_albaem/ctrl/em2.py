@@ -2,6 +2,7 @@
 ALBA EM2 client
 '''
 
+import json
 import logging
 import queue
 import sys
@@ -338,13 +339,19 @@ class ZmqStreamReceiver(object):
         self._port = port
         self._running = False
         self._thread = None
-        self._clear_message_queue()
+        self._reset_worker_state()
 
-    def _clear_message_queue(self):
+    def _reset_worker_state(self):
         self._messages = CountableQueue()
+        self._expected_frame_number = 0
+        self._last_worker_error = ""
 
     @property
     def nb_points_received(self):
+        if self._last_worker_error:
+            raise RuntimeError(
+                "Error in worker thread: {}".format(self._last_worker_error)
+            )
         return self._messages.total_count
 
     def read(self, start_position, nb_points):
@@ -352,6 +359,7 @@ class ZmqStreamReceiver(object):
         scpi_format_data = self._prepare_scpi_format_data()
         for _ in range(nb_points):
             message = self._messages.get()
+            self._abort_if_any_frames_dropped(message)
             for channel in scpi_format_data:
                 scpi_format_data[channel].append(message[channel])
         return scpi_format_data
@@ -374,6 +382,17 @@ class ZmqStreamReceiver(object):
             )
         return nb_points
 
+    def _abort_if_any_frames_dropped(self, message):
+        frame_number = message["frame_number"]
+        if frame_number != self._expected_frame_number:
+            raise RuntimeError(
+                "Dropped frame(s): "
+                "received #{} != expected #{}. "
+                "System may be overloaded, or there may be multiple ZMQ receivers "
+                "running.".format(frame_number, self._expected_frame_number)
+            )
+        self._expected_frame_number += 1
+
     @staticmethod
     def _prepare_scpi_format_data():
         channel_keys = ["CHAN{:02d}".format(index)
@@ -385,23 +404,24 @@ class ZmqStreamReceiver(object):
         if self._running:
             self.stop()
         self._thread = threading.Thread(
-            target=self._zmq_receiver,
-            name='zmq-receiver',
-            daemon=True,
+            target=self._zmq_worker,
+            name='zmq-worker',
         )
+        self._thread.daemon = True
+        self._reset_worker_state()
         self._running = True
         self._thread.start()
 
     def stop(self):
-        self._running = False
-        self._thread.join()
+        if self._running:
+            self._running = False
+            self._thread.join()
 
     @property
     def running(self):
         return self._running
 
-    def _zmq_receiver(self):
-        self._clear_message_queue()
+    def _zmq_worker(self):
         context = zmq.Context()
         receiver = context.socket(zmq.PULL)
         receiver.connect('tcp://{}:{}'.format(self._host, self._port))
@@ -409,9 +429,22 @@ class ZmqStreamReceiver(object):
         poller.register(receiver, zmq.POLLIN)
         while self._running:
             if poller.poll(timeout=ZMQ_READ_TIMEOUT_MS):
-                message = receiver.recv_json()
-                if 'message_type' in message and message['message_type'] == 'data':
+                self._try_get_zmq_message(receiver)
+
+    def _try_get_zmq_message(self, receiver):
+        try:
+            raw_message = receiver.recv()
+            try:
+                message = json.loads(raw_message)
+                if message.get("message_type") == "data":
                     self._messages.put(message)
+            except json.decoder.JSONDecodeError as exc:
+                self._last_worker_error = (
+                    "Error deserialising JSON message: {} => {}. "
+                    "Check fast buffer code on Electrometer.".format(raw_message, exc)
+                )
+        except Exception as exc:
+            self._last_worker_error = "General error receiving message: {}.".format(exc)
 
 
 class CountableQueue(object):
