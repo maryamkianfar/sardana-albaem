@@ -291,17 +291,17 @@ class Em2(object):
     def data(self):
         return AcquisitionData(self)
 
-    def read(self, start_pos=0, nb_points=None):
+    def read(self, start_position=0, nb_points=None):
         if self._zmq_receiver.running:
-            data = self._zmq_receiver.read(start_pos, nb_points)
+            data = self._zmq_receiver.read(start_position, nb_points)
         else:
-            data = self._read_via_scpi(start_pos, nb_points)
+            data = self._read_via_scpi(start_position, nb_points)
         return data
 
-    def _read_via_scpi(self, start_pos=0, nb_points=None):
+    def _read_via_scpi(self, start_position=0, nb_points=None):
         if self.read_index_bug:
-            start_pos -= 1
-        cmd = 'ACQU:MEAS? {0}'.format(start_pos)
+            start_position -= 1
+        cmd = 'ACQU:MEAS? {0}'.format(start_position)
         if nb_points is not None:
             cmd += ',{0}'.format(nb_points)
         data = dict(eval(self.command(cmd)))
@@ -347,8 +347,8 @@ class ZmqStreamReceiver(object):
     def nb_points_received(self):
         return self._messages.total_count
 
-    def read(self, start_pos, nb_points):
-        nb_points = self._get_nb_messages_to_read(start_pos, nb_points)
+    def read(self, start_position, nb_points):
+        nb_points = self._get_nb_messages_to_read(start_position, nb_points)
         scpi_format_data = self._prepare_scpi_format_data()
         for _ in range(nb_points):
             message = self._messages.get()
