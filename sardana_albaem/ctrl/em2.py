@@ -25,6 +25,7 @@ class Em2Error(Exception):
 SCPI_CONTROL_PORT = 5025
 ZMQ_STREAMING_PORT = 22003
 ZMQ_READ_TIMEOUT_MS = 50
+ZMQ_RECEIVER_MAX_MESSAGES_IN_FLIGHT = 1000000
 
 CHANNEL_MIN = 1
 CHANNEL_MAX = 4
@@ -424,6 +425,7 @@ class ZmqStreamReceiver(object):
     def _zmq_worker(self):
         context = zmq.Context()
         receiver = context.socket(zmq.PULL)
+        receiver.set_hwm(ZMQ_RECEIVER_MAX_MESSAGES_IN_FLIGHT)
         receiver.connect('tcp://{}:{}'.format(self._host, self._port))
         poller = zmq.Poller()
         poller.register(receiver, zmq.POLLIN)
