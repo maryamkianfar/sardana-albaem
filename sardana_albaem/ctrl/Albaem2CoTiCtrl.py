@@ -179,10 +179,6 @@ class Albaem2CoTiCtrl(CounterTimerController):
                     "Fast buffer ZMQ streaming not supported by this version of "
                     "electrometer software.  Change acquisition mode to a "
                     "non-streaming mode, e.g., 'CURRENT'")
-            if self._synchronization == AcqSynch.HardwareGate:
-                raise ValueError(
-                    "HardwareGate synchronization not supported in fast buffer mode"
-                )
 
         self._clean_variables()
         self._nb_points_expected_per_start = repetitions
