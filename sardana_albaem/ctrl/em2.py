@@ -187,7 +187,9 @@ class Em2(object):
     def software_version(self):
         if self._software_version is None:
             str_version = self.idn.split(',')[-1].strip()
-            self._software_version = tuple([int(x) for x in str_version.split('.')])
+            self._software_version = tuple(
+                [_try_make_int(x) for x in str_version.split('.')]
+            )
         return self._software_version
 
     @property
@@ -501,6 +503,15 @@ def _acquire(em, acq_time=None, nb_points=None, read=True):
     logging.info('acq took {0}'.format(time.time()-start))
     if read:
         return em.read_all()
+
+
+def _try_make_int(string):
+    result = string
+    try:
+        result = int(result)
+    except ValueError:
+        pass
+    return result
 
 
 if __name__ == '__main__':
