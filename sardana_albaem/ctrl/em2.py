@@ -214,7 +214,7 @@ class Em2(object):
 
     @property
     def nb_points_ready(self):
-        if self._zmq_receiver.running:
+        if self._zmq_receiver.started:
             return self._zmq_receiver.nb_points_received
         else:
             return self._get_nb_points_ready_via_scpi()
@@ -288,7 +288,7 @@ class Em2(object):
 
     def stop_acquisition(self):
         self.command('ACQU:STOP True')
-        if self._zmq_receiver.running:
+        if self._zmq_receiver.started:
             self._zmq_receiver.stop()
 
     @property
@@ -296,7 +296,7 @@ class Em2(object):
         return AcquisitionData(self)
 
     def read(self, start_position=0, nb_points=None):
-        if self._zmq_receiver.running:
+        if self._zmq_receiver.started:
             data = self._zmq_receiver.read(start_position, nb_points)
         else:
             data = self._read_via_scpi(start_position, nb_points)
@@ -340,7 +340,8 @@ class ZmqStreamReceiver(object):
     def __init__(self, host, port):
         self._host = host
         self._port = port
-        self._running = False
+        self._started = False
+        self._expecting_messages = False
         self._thread = None
         self._reset_worker_state()
 
@@ -407,7 +408,7 @@ class ZmqStreamReceiver(object):
         return scpi_format_data
 
     def start(self):
-        if self._running:
+        if self._started:
             self.stop()
         self._thread = threading.Thread(
             target=self._zmq_worker,
@@ -415,17 +416,19 @@ class ZmqStreamReceiver(object):
         )
         self._thread.daemon = True
         self._reset_worker_state()
-        self._running = True
+        self._expecting_messages = True
         self._thread.start()
+        self._started = True
 
     def stop(self):
-        if self._running:
-            self._running = False
+        if self._thread.is_alive():
+            self._expecting_messages = False
             self._thread.join()
+        self._started = False
 
     @property
-    def running(self):
-        return self._running
+    def started(self):
+        return self._started
 
     def _zmq_worker(self):
         context = zmq.Context()
@@ -434,7 +437,7 @@ class ZmqStreamReceiver(object):
         receiver.connect('tcp://{}:{}'.format(self._host, self._port))
         poller = zmq.Poller()
         poller.register(receiver, zmq.POLLIN)
-        while self._running:
+        while self._expecting_messages:
             if poller.poll(timeout=ZMQ_READ_TIMEOUT_MS):
                 self._try_get_zmq_message(receiver)
 
@@ -448,6 +451,7 @@ class ZmqStreamReceiver(object):
                     self._messages.put(message)
                 elif message_type == "series-end":
                     self._check_series_end_for_errors(message)
+                    self._expecting_messages = False
             except json.decoder.JSONDecodeError as exc:
                 self._last_worker_error = (
                     "Error deserialising JSON message: {} => {}. "
