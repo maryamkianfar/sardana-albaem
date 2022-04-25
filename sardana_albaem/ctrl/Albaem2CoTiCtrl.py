@@ -121,8 +121,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
     def _clean_variables(self):
         status = self._em2.acquisition_state
-        if status in ['ACQUIRING', 'RUNNING']:
-            self._em2.stop_acquisition()
+        self._em2.stop_acquisition()
 
         self._use_sw_trigger = True
         self._new_data = {}
