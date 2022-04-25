@@ -351,10 +351,7 @@ class ZmqStreamReceiver(object):
 
     @property
     def nb_points_received(self):
-        if self._last_worker_error:
-            raise RuntimeError(
-                "Error in worker thread: {}".format(self._last_worker_error)
-            )
+        self._abort_if_any_worker_errors()
         return self._messages.total_count
 
     def read(self, start_position, nb_points):
@@ -384,6 +381,12 @@ class ZmqStreamReceiver(object):
                     .format(nb_points, available)
             )
         return nb_points
+
+    def _abort_if_any_worker_errors(self):
+        if self._last_worker_error:
+            raise RuntimeError(
+                "Error in worker thread: {}".format(self._last_worker_error)
+            )
 
     def _abort_if_any_frames_dropped(self, message):
         frame_number = message["frame_number"]
@@ -440,8 +443,11 @@ class ZmqStreamReceiver(object):
             raw_message = receiver.recv()
             try:
                 message = json.loads(raw_message)
-                if message.get("message_type") == "data":
+                message_type = message.get("message_type", "")
+                if message_type == "data":
                     self._messages.put(message)
+                elif message_type == "series-end":
+                    self._check_series_end_for_errors(message)
             except json.decoder.JSONDecodeError as exc:
                 self._last_worker_error = (
                     "Error deserialising JSON message: {} => {}. "
@@ -449,6 +455,22 @@ class ZmqStreamReceiver(object):
                 )
         except Exception as exc:
             self._last_worker_error = "General error receiving message: {}.".format(exc)
+
+    def _check_series_end_for_errors(self, message):
+        details = message.get("detector_specific", {})
+        memory_overflow = details.get("memory_overflow", False)
+        read_overflow = details.get("read_overflow", False)
+        if memory_overflow:
+            self._last_worker_error = (
+                "Error - Electrometer FPGA memory overflow.  The integration time "
+                "may be too short, or ZMQ receiver too slow."
+            )
+        elif read_overflow:
+            self._last_worker_error = (
+                "Error - Electrometer FPGA memory read overflow.  Check the "
+                "fast buffer code on Electrometer - it may be reading from the "
+                "FPGA incorrectly."
+            )
 
 
 class CountableQueue(object):
