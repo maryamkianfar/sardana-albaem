@@ -4,4 +4,5 @@ include:
 
 variables:
   PYTHON_VERSIONS: '/python2.7/'
+  TEST_PYTHON_VERSIONS: '/python2.7|python3.6/'
   FPM_FLAGS: '--no-python-fix-name --no-python-dependencies -d sardana -d python-sockio'
