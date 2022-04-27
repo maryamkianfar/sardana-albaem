@@ -18,6 +18,11 @@ if PY34:
 else:
     from sockio.py2 import TCP
 
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError
+
 
 class Em2Error(Exception):
     pass
@@ -446,19 +451,28 @@ class ZmqStreamReceiver(object):
             raw_message = receiver.recv()
             try:
                 message = json.loads(raw_message)
-                message_type = message.get("message_type", "")
-                if message_type == "data":
-                    self._messages.put(message)
-                elif message_type == "series-end":
-                    self._check_series_end_for_errors(message)
-                    self._expecting_messages = False
-            except json.decoder.JSONDecodeError as exc:
+                self._handle_message(message)
+            except JSONDecodeError as exc:
                 self._last_worker_error = (
                     "Error deserialising JSON message: {} => {}. "
                     "Check fast buffer code on Electrometer.".format(raw_message, exc)
                 )
         except Exception as exc:
             self._last_worker_error = "General error receiving message: {}.".format(exc)
+
+    def _handle_message(self, message):
+        message_type = message.get("message_type", "")
+        if message_type == "data":
+            self._messages.put(message)
+        elif message_type == "series-end":
+            self._check_series_end_for_errors(message)
+            self._expecting_messages = False
+        elif message_type == "series-start":
+            pass
+        else:
+            raise RuntimeError(
+                "Unknown message type from Electrometer: {}".format(message)
+            )
 
     def _check_series_end_for_errors(self, message):
         details = message.get("detector_specific", {})
