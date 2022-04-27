@@ -480,18 +480,22 @@ class ZmqStreamReceiver(object):
         read_overflow = details.get("read_overflow", False)
         if memory_overflow:
             self._last_worker_error = (
-                "Error - Electrometer FPGA memory overflow.  The integration time "
+                "Error - Electrometer FPGA memory overflow. The integration time "
                 "may be too short, or ZMQ receiver too slow."
             )
         elif read_overflow:
             self._last_worker_error = (
-                "Error - Electrometer FPGA memory read overflow.  Check the "
+                "Error - Electrometer FPGA memory read overflow. Check the "
                 "fast buffer code on Electrometer - it may be reading from the "
                 "FPGA incorrectly."
             )
 
 
 class CountableQueue(object):
+    """
+    A queue that counts the total number of items inserted, and remembers
+    the index of the item at the front.  It is thread safe.
+    """
 
     def __init__(self):
         self._queue = queue.Queue()

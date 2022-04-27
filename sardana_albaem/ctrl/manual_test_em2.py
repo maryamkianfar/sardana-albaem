@@ -92,7 +92,7 @@ def get_acquisition_state(em, nb_points_expected):
     hardware_state = em.acquisition_state
     log.debug('HW state %s', hardware_state)
 
-    allowed_states = ['ACQUIRING', 'RUNNING', 'ON', 'FAULT']
+    allowed_states = {'ACQUIRING', 'RUNNING', 'ON', 'FAULT'}
     if hardware_state == 'FAULT' or hardware_state not in allowed_states:
         log.error('Invalid acquisition state %r - aborting.', hardware_state)
         return 'FAULT'
@@ -132,7 +132,7 @@ def main(host, port, nb_scans, integration, nb_points, trig_mode, acq_mode, debu
     if trig_mode == 'SOFTWARE':
         repetitions = 1
         nb_starts = nb_points
-    elif trig_mode in ['HARDWARE', 'GATE', 'AUTOTRIGGER', 'HW_AUTOTRIGGER']:
+    elif trig_mode in {'HARDWARE', 'GATE', 'AUTOTRIGGER', 'HW_AUTOTRIGGER'}:
         repetitions = nb_points
         nb_starts = 1
     else:
