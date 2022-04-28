@@ -120,9 +120,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self.formulas = {1: 'value', 2: 'value', 3: 'value', 4: 'value'}
 
     def _clean_variables(self):
-        status = self._em2.acquisition_state
         self._em2.stop_acquisition()
-
         self._use_sw_trigger = True
         self._new_data = {}
         self._started = False

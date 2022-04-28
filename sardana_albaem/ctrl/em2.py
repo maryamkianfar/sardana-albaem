@@ -366,6 +366,7 @@ class ZmqStreamReceiver(object):
         for _ in range(nb_points):
             message = self._messages.get()
             self._abort_if_any_frames_dropped(message)
+            self._update_frame_number(message)
             for channel in scpi_format_data:
                 scpi_format_data[channel].append(message[channel])
         return scpi_format_data
@@ -403,7 +404,10 @@ class ZmqStreamReceiver(object):
                 "System may be overloaded, or there may be multiple ZMQ receivers "
                 "running.".format(frame_number, self._expected_frame_number)
             )
-        self._expected_frame_number += 1
+
+    def _update_frame_number(self, message):
+        frame_number = message["frame_number"]
+        self._expected_frame_number = frame_number + 1
 
     @staticmethod
     def _prepare_scpi_format_data():
