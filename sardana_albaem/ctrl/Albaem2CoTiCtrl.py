@@ -4,11 +4,11 @@ import time
 from sardana import State, DataAccess
 from sardana.pool import AcqSynch
 from sardana.pool.controller import CounterTimerController, Type, Access, \
-    Description, Memorize, Memorized, NotMemorized
+    Description, DefaultValue, Memorize, Memorized, NotMemorized
 from sardana.sardanavalue import SardanaValue
 from functools import wraps
 
-from sardana_albaem.ctrl.em2 import Em2
+from sardana_albaem.ctrl.em2 import Em2, ZMQ_STREAMING_PORT
 
 
 def debug_it(func):
@@ -46,8 +46,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
             Type: str
         },
         'Port': {
-            Description: 'AlbaEm Host name',
+            Description: 'AlbaEm control port (SCPI)',
             Type: int
+        },
+        'ZmqPort': {
+            Description: 'AlbaEm fast buffer streaming port (ZMQ)',
+            Type: int,
+            DefaultValue: ZMQ_STREAMING_PORT
         },
         'ExtTriggerInput': {
             Description: 'ExtTriggerInput',
@@ -58,8 +63,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
     ctrl_attributes = {
         'AcquisitionMode': {
             Type: str,
-            # TODO define the modes names ?? (I_AVGCURR_A, Q_CHARGE_C)
-            Description: 'Acquisition Mode: CHARGE, INTEGRATION',
+            Description: 'Acquisition Mode: CHARGE, CURRENT, FAST_BUFFER',
             Access: DataAccess.ReadWrite,
             Memorize: Memorized
         },
@@ -100,7 +104,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         msg = "__init__(%s, %s): Entering...", repr(inst), repr(props)
         self._log.debug(msg)
 
-        self._em2 = Em2(self.AlbaEmHost, self.Port)
+        self._em2 = Em2(self.AlbaEmHost, self.Port, self.ZmqPort)
         self._synchronization = AcqSynch.SoftwareTrigger
         self._latency_time = 0.001  # In fact, it is just 320us
         self._use_sw_trigger = True
@@ -116,10 +120,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self.formulas = {1: 'value', 2: 'value', 3: 'value', 4: 'value'}
 
     def _clean_variables(self):
-        status = self._em2.acquisition_state
-        if status in ['ACQUIRING', 'RUNNING']:
-            self._em2.stop_acquisition()
-
+        self._em2.stop_acquisition()
         self._use_sw_trigger = True
         self._new_data = {}
         self._started = False
@@ -169,6 +170,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if self._synchronization in [AcqSynch.SoftwareStart,
                                      AcqSynch.HardwareStart]:
             raise ValueError('The Start synchronization is not allowed yet')
+        if self._em2.zmq_streaming_required:
+            if not self._em2.zmq_streaming_supported:
+                raise ValueError(
+                    "Fast buffer ZMQ streaming not supported by this version of "
+                    "electrometer software.  Change acquisition mode to a "
+                    "non-streaming mode, e.g., 'CURRENT'")
 
         self._clean_variables()
         self._nb_points_expected_per_start = repetitions

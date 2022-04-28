@@ -39,9 +39,14 @@ def main():
     packages = find_packages()
 
     # Add your dependencies in the following line.
-    install_requires = ['sardana', 'sockio']
+    install_requires = [
+        "sardana",
+        "sockio",
+        "pyzmq<20.0; python_version<'3'",
+        "pyzmq; python_version>='3'",
+    ]
 
-    python_requires = '>=2.7'
+    python_requires = ">=2.7"
 
     setup(
         name=name,
