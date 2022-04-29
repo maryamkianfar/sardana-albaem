@@ -115,11 +115,11 @@ def get_acquisition_state(em, nb_points_expected):
                   ['SOFTWARE', 'HARDWARE', 'GATE', 'AUTOTRIGGER', 'HW_AUTOTRIGGER']
               ))
 @click.option('--acq_mode', default='CURRENT', help='Acquisition mode',
-              type=click.Choice(['CURRENT', 'CHARGE', 'FAST_BUFFER', ]))
+              type=click.Choice(['CURRENT', 'CHARGE', 'STREAMING', ]))
 @click.option('--debug', default=False, flag_value=True)
 @click.option('--stop', default=False, flag_value=True, help='Stop acquisition after test')
 @click.option('--zmq_port', type=click.INT,
-              default=ZMQ_STREAMING_PORT, help="ZMQ fast-buffer streaming port")
+              default=ZMQ_STREAMING_PORT, help="ZMQ streaming port")
 def main(host, port, nb_scans, integration, nb_points, trig_mode, acq_mode, debug, stop, zmq_port):
     level = logging.INFO
     if debug:
