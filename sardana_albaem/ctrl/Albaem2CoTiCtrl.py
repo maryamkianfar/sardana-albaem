@@ -50,7 +50,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             Type: int
         },
         'ZmqPort': {
-            Description: 'AlbaEm fast buffer streaming port (ZMQ)',
+            Description: 'AlbaEm streaming port (ZMQ)',
             Type: int,
             DefaultValue: ZMQ_STREAMING_PORT
         },
@@ -63,7 +63,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
     ctrl_attributes = {
         'AcquisitionMode': {
             Type: str,
-            Description: 'Acquisition Mode: CHARGE, CURRENT, FAST_BUFFER',
+            Description: 'Acquisition Mode: CHARGE, CURRENT, STREAMING',
             Access: DataAccess.ReadWrite,
             Memorize: Memorized
         },
@@ -173,7 +173,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if self._em2.zmq_streaming_required:
             if not self._em2.zmq_streaming_supported:
                 raise ValueError(
-                    "Fast buffer ZMQ streaming not supported by this version of "
+                    "ZMQ streaming not supported by this version of "
                     "electrometer software.  Change acquisition mode to a "
                     "non-streaming mode, e.g., 'CURRENT'")
 

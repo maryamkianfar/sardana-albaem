@@ -162,7 +162,7 @@ class Em2(object):
 
     @property
     def zmq_streaming_required(self):
-        return self.acquisition_mode.upper() == 'FAST_BUFFER'
+        return self.acquisition_mode.upper() == 'STREAMING'
 
     def __getitem__(self, i):
         return self.channels[i]
@@ -459,7 +459,7 @@ class ZmqStreamReceiver(object):
             except JSONDecodeError as exc:
                 self._last_worker_error = (
                     "Error deserialising JSON message: {} => {}. "
-                    "Check fast buffer code on Electrometer.".format(raw_message, exc)
+                    "Check streaming code on Electrometer.".format(raw_message, exc)
                 )
         except Exception as exc:
             self._last_worker_error = "General error receiving message: {}.".format(exc)
@@ -490,7 +490,7 @@ class ZmqStreamReceiver(object):
         elif read_overflow:
             self._last_worker_error = (
                 "Error - Electrometer FPGA memory read overflow. Check the "
-                "fast buffer code on Electrometer - it may be reading from the "
+                "streaming code on Electrometer - it may be reading from the "
                 "FPGA incorrectly."
             )
 
