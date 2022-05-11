@@ -30,7 +30,7 @@ test:
     - pip check
 
 about:
-  home: https://github.com/MaxIV-KitsControls/sardana-albaem
+  home: https://gitlab.maxiv.lu.se/kits-maxiv/sardana-albaem
   license: GPL-3.0-or-later
   license_file: ../LICENSE
   summary: AlbaEM Sardana Controller
