@@ -13,10 +13,10 @@ build:
 requirements:
   host:
     - pip
-    - python
+    - python >=3.6
     - setuptools-scm
   run:
-    - python
+    - python >=3.6
     - pyzmq
     - sardana
     - sockio
@@ -31,7 +31,7 @@ test:
 
 about:
   home: https://github.com/MaxIV-KitsControls/sardana-albaem
-  license: GPL-3.0
+  license: GPL-3.0-or-later
   license_file: ../LICENSE
   summary: AlbaEM Sardana Controller
   description: |
