@@ -1,0 +1,38 @@
+package:
+  name: sardana-albaem
+  version: "{{ SETUPTOOLS_SCM_PRETEND_VERSION }}"
+
+source:
+  # Relative path to the parent directory of the recipe.
+  path: ..
+
+build:
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+
+requirements:
+  host:
+    - pip
+    - python >=3.6
+    - setuptools-scm
+  run:
+    - python >=3.6
+    - pyzmq
+    - sardana
+    - sockio
+
+test:
+  imports:
+    - sardana_albaem
+  requires:
+    - pip
+  commands:
+    - pip check
+
+about:
+  home: https://gitlab.maxiv.lu.se/kits-maxiv/sardana-albaem
+  license: GPL-3.0-or-later
+  license_file: ../LICENSE
+  summary: AlbaEM Sardana Controller
+  description: |
+    This allows the 4-channel ALBA Electrometer to be used from Sardana.

@@ -34,7 +34,7 @@ def main():
 
     license = "GPLv3"
 
-    url = "https://github.com/MaxIV-KitsControls/sardana-albaem"
+    url = "https://gitlab.maxiv.lu.se/kits-maxiv/sardana-albaem"
 
     packages = find_packages()
 
